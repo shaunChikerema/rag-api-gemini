@@ -1,11 +1,11 @@
 import os
 from typing import List, Tuple, Optional
-import google.generativeai as genai
+from groq import Groq
 from dotenv import load_dotenv
 
 load_dotenv()
 
-GENERATION_MODEL = "gemini-1.5-flash"  # Free tier, fast + capable
+GENERATION_MODEL = "llama-3.3-70b-versatile"  # Groq free tier, fast + capable
 
 SYSTEM_PROMPT = """You are a research assistant. Answer the user's question using ONLY the context provided below.
 
@@ -23,15 +23,11 @@ Sources:
 """
 
 
-def _get_model():
-    api_key = os.getenv("GEMINI_API_KEY")
+def _get_client():
+    api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
-        raise ValueError("GEMINI_API_KEY must be set in .env")
-    genai.configure(api_key=api_key)
-    return genai.GenerativeModel(
-        model_name=GENERATION_MODEL,
-        generation_config=genai.GenerationConfig(temperature=0.2),
-    )
+        raise ValueError("GROQ_API_KEY must be set in .env")
+    return Groq(api_key=api_key)
 
 
 def generate_answer(
@@ -44,7 +40,7 @@ def generate_answer(
     with inline citations. Returns (answer_text, sources_list).
     """
     history = history or []
-    model = _get_model()
+    client = _get_client()
 
     # Deduplicate chunks by URL + content
     seen = set()
@@ -74,16 +70,17 @@ def generate_answer(
     )
 
     # Build chat history for multi-turn support
-    chat_history = []
+    messages = [{"role": "system", "content": system_message}]
     for turn in history:
-        role = "user" if turn["role"] == "user" else "model"
-        chat_history.append({"role": role, "parts": [turn["content"]]})
+        role = "user" if turn["role"] == "user" else "assistant"
+        messages.append({"role": role, "content": turn["content"]})
 
-    # Start chat session with history
-    chat = model.start_chat(history=chat_history)
+    messages.append({"role": "user", "content": question})
 
-    # Prepend system context to the question
-    full_prompt = f"{system_message}\n\nQuestion: {question}"
-    response = chat.send_message(full_prompt)
+    response = client.chat.completions.create(
+        model=GENERATION_MODEL,
+        messages=messages,
+        temperature=0.2,
+    )
 
-    return response.text, sources_output
+    return response.choices[0].message.content, sources_output

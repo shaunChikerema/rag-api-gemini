@@ -1,20 +1,20 @@
 import os
 from typing import List
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from dotenv import load_dotenv
 from db import get_supabase
 
 load_dotenv()
 
-EMBEDDING_MODEL = "models/text-embedding-004"
+EMBEDDING_MODEL = "models/gemini-embedding-001"
 
 
-def _get_genai():
+def _get_client():
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
         raise ValueError("GEMINI_API_KEY must be set in .env")
-    genai.configure(api_key=api_key)
-    return genai
+    return genai.Client(api_key=api_key)
 
 
 def retrieve_chunks(question: str, top_k: int = 5, similarity_threshold: float = 0.5) -> List[dict]:
@@ -23,15 +23,15 @@ def retrieve_chunks(question: str, top_k: int = 5, similarity_threshold: float =
     using pgvector cosine similarity via Supabase RPC.
     Returns list of {content, url, similarity}
     """
-    _get_genai()
+    client = _get_client()
 
     # Embed the question (use retrieval_query task type for better results)
-    result = genai.embed_content(
+    result = client.models.embed_content(
         model=EMBEDDING_MODEL,
-        content=question,
-        task_type="retrieval_query",
+        contents=question,
+        config=types.EmbedContentConfig(task_type="RETRIEVAL_QUERY"),
     )
-    query_embedding = result["embedding"]
+    query_embedding = result.embeddings[0].values
 
     # Call the pgvector match function in Supabase
     supabase = get_supabase()
