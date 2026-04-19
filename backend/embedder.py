@@ -8,7 +8,7 @@ from db import get_supabase
 load_dotenv()
 
 EMBEDDING_MODEL = "models/gemini-embedding-001"
-BATCH_SIZE = 50  # Gemini embedding batch limit
+BATCH_SIZE = 50
 
 
 def _get_client():
@@ -19,15 +19,9 @@ def _get_client():
 
 
 def embed_and_store(chunks: List[dict]) -> int:
-    """
-    Take a list of chunk dicts, embed each one using Gemini,
-    and insert into the Supabase `documents` table.
-    Returns the number of chunks stored.
-    """
     client = _get_client()
     supabase = get_supabase()
 
-    # Deduplicate by content to avoid storing duplicates on re-ingest
     seen_content = set()
     unique_chunks = []
     for c in chunks:
@@ -37,13 +31,10 @@ def embed_and_store(chunks: List[dict]) -> int:
             unique_chunks.append(c)
 
     total = 0
-
-    # Process in batches
     for i in range(0, len(unique_chunks), BATCH_SIZE):
         batch = unique_chunks[i: i + BATCH_SIZE]
         texts = [c["content"] for c in batch]
 
-        # Embed batch
         result = client.models.embed_content(
             model=EMBEDDING_MODEL,
             contents=texts,
@@ -53,10 +44,10 @@ def embed_and_store(chunks: List[dict]) -> int:
         rows = []
         for j, embedding_obj in enumerate(result.embeddings):
             rows.append({
-                "content":   batch[j]["content"],
-                "embedding": embedding_obj.values,  # list of 768 floats
+                "content": batch[j]["content"],
+                "embedding": embedding_obj.values,
                 "metadata": {
-                    "url":   batch[j].get("url", ""),
+                    "url": batch[j].get("url", ""),
                     "label": batch[j].get("label", ""),
                 },
             })
@@ -65,3 +56,34 @@ def embed_and_store(chunks: List[dict]) -> int:
         total += len(rows)
 
     return total
+
+
+def list_sources() -> List[dict]:
+    """Return all distinct sources with chunk counts."""
+    supabase = get_supabase()
+    result = supabase.table("documents").select("metadata").execute()
+
+    counts = {}
+    for row in result.data:
+        url = row.get("metadata", {}).get("url", "unknown")
+        label = row.get("metadata", {}).get("label", "")
+        if url not in counts:
+            counts[url] = {"url": url, "label": label, "chunks": 0}
+        counts[url]["chunks"] += 1
+
+    return sorted(counts.values(), key=lambda x: x["chunks"], reverse=True)
+
+
+def delete_source(url: str) -> int:
+    """Delete all chunks for a given source URL."""
+    supabase = get_supabase()
+    # Supabase doesn't support filtering by JSONB in delete easily,
+    # so we fetch IDs first then delete by ID
+    result = supabase.table("documents").select("id, metadata").execute()
+    ids_to_delete = [
+        row["id"] for row in result.data
+        if row.get("metadata", {}).get("url") == url
+    ]
+    if ids_to_delete:
+        supabase.table("documents").delete().in_("id", ids_to_delete).execute()
+    return len(ids_to_delete)
