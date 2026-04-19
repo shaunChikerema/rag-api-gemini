@@ -1,8 +1,0 @@
-fastapi
-uvicorn
-google-genai
-beautifulsoup4
-httpx
-python-dotenv
-supabase
-groq
