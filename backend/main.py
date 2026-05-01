@@ -98,6 +98,10 @@ def root():
         ],
     }
 
+@app.head("/")
+def root_head():
+    return {}
+
 
 @app.post("/ingest", response_model=IngestResponse)
 async def ingest(req: IngestRequest):
