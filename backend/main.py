@@ -83,7 +83,7 @@ class HistoryResponse(BaseModel):
 def root():
     return {
         "status": "RAG API running",
-        "model": "llama-3.3-70b-versatile",
+        "model": "openai/gpt-oss-120b",
         "embeddings": "gemini-embedding-001",
         "version": "5.0.0",
         "features": [

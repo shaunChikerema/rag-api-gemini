@@ -9,6 +9,7 @@ from db import get_supabase
 load_dotenv()
 
 EMBEDDING_MODEL = "models/gemini-embedding-001"
+GENERATION_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
 
 
 def _get_gemini():
@@ -51,7 +52,7 @@ Reply with ONLY the rewritten query. No explanation, no punctuation changes, no 
 
     client = _get_groq()
     response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
+        model=GENERATION_MODEL,
         messages=[{"role": "user", "content": prompt}],
         temperature=0.0,
         max_tokens=120,
@@ -74,7 +75,7 @@ Reply with ONLY the 2 alternatives, one per line. No numbering, no explanation."
     client = _get_groq()
     try:
         response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model=GENERATION_MODEL,
             messages=[{"role": "user", "content": prompt}],
             temperature=0.4,
             max_tokens=120,
