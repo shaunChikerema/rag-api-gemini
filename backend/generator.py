@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-GENERATION_MODEL = "llama-3.3-70b-versatile"
+GENERATION_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
 
 RAG_SYSTEM_PROMPT = """You are Askragify — a smart, warm, and witty assistant with a real personality.
 
